@@ -8,7 +8,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-2022
-    timeout-minutes: 120
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -36,6 +36,11 @@ jobs:
           ./bootstrap-vcpkg.bat
           ./vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
 
+      - name: Install flutter_rust_bridge_codegen
+        shell: bash
+        run: |
+          cargo install flutter_rust_bridge_codegen --version 1.80.6
+
       - name: Apply branding
         shell: bash
         run: |
@@ -43,6 +48,7 @@ jobs:
           sed -i "s/ProductName = \"RustDesk\"/ProductName = \"NexusRemote\"/g" Cargo.toml
           sed -i "s/FileDescription = \"RustDesk Remote Desktop\"/FileDescription = \"NexusRemote Remote Desktop\"/g" Cargo.toml
           sed -i "s/OriginalFilename = \"rustdesk.exe\"/OriginalFilename = \"nexusremote.exe\"/g" Cargo.toml
+          sed -i "s/default-run = \"rustdesk\"/default-run = \"nexusremote\"/g" Cargo.toml
           sed -i "s/set(BINARY_NAME \"rustdesk\")/set(BINARY_NAME \"nexusremote\")/g" flutter/windows/CMakeLists.txt
           sed -i "s/CompanyName\", \"Purslane Ltd/CompanyName\", \"GMTec/g" flutter/windows/runner/Runner.rc
           sed -i "s/FileDescription\", \"RustDesk Remote Desktop/FileDescription\", \"NexusRemote Remote Desktop/g" flutter/windows/runner/Runner.rc
@@ -54,6 +60,14 @@ jobs:
             sed -i "s/\"RustDesk\"/\"NexusRemote\"/g" libs/hbb_common/src/config.rs
           fi
           echo "Branding applied"
+
+      - name: Generate bridge code
+        shell: bash
+        run: |
+          cd flutter
+          flutter pub get
+          cd ..
+          flutter_rust_bridge_codegen generate
 
       - name: Build Rust
         shell: bash
@@ -69,7 +83,6 @@ jobs:
         shell: bash
         run: |
           cd flutter
-          flutter pub get
           flutter build windows --release
 
       - name: Package
