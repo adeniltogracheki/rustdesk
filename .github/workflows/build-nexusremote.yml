@@ -33,9 +33,6 @@ jobs:
           .\bootstrap-vcpkg.bat
           .\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
 
-      - name: Setup LLVM
-        run: choco install llvm -y --version 15.0.6
-
       - name: Apply branding
         run: |
           $env:APP_NAME = "NexusRemote"
