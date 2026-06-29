@@ -61,7 +61,7 @@ jobs:
           export VCPKG_ROOT=/c/vcpkg
           export LIBCLANG_PATH="/c/Program Files/LLVM/bin"
           cd libs/virtual_display/dylib
-          cargo build --locked --release
+          cargo build --release
           cd ../../..
           python build.py --flutter --hwcodec --skip-portable-pack
 
