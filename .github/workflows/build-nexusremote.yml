@@ -1,4 +1,4 @@
-name: Build NexusRemote
+name: Build NexusRemote (Sciter - sem Flutter)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 jobs:
   build-windows:
     runs-on: windows-2022
-    timeout-minutes: 180
+    timeout-minutes: 120
 
     steps:
       - name: Checkout
@@ -18,12 +18,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.24.5"
-          channel: "stable"
 
       - name: Setup vcpkg
         shell: bash
@@ -36,11 +30,6 @@ jobs:
           ./bootstrap-vcpkg.bat
           ./vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
 
-      - name: Install flutter_rust_bridge_codegen
-        shell: bash
-        run: |
-          cargo install flutter_rust_bridge_codegen --version 1.80.1
-
       - name: Apply branding
         shell: bash
         run: |
@@ -49,49 +38,25 @@ jobs:
           sed -i "s/FileDescription = \"RustDesk Remote Desktop\"/FileDescription = \"NexusRemote Remote Desktop\"/g" Cargo.toml
           sed -i "s/OriginalFilename = \"rustdesk.exe\"/OriginalFilename = \"nexusremote.exe\"/g" Cargo.toml
           sed -i "s/default-run = \"rustdesk\"/default-run = \"nexusremote\"/g" Cargo.toml
-          sed -i "s/set(BINARY_NAME \"rustdesk\")/set(BINARY_NAME \"nexusremote\")/g" flutter/windows/CMakeLists.txt
-          sed -i "s/CompanyName\", \"Purslane Ltd/CompanyName\", \"GMTec/g" flutter/windows/runner/Runner.rc
-          sed -i "s/FileDescription\", \"RustDesk Remote Desktop/FileDescription\", \"NexusRemote Remote Desktop/g" flutter/windows/runner/Runner.rc
-          sed -i "s/InternalName\", \"rustdesk/InternalName\", \"nexusremote/g" flutter/windows/runner/Runner.rc
-          sed -i "s/OriginalFilename\", \"rustdesk.exe/OriginalFilename\", \"nexusremote.exe/g" flutter/windows/runner/Runner.rc
-          sed -i "s/ProductName\", \"RustDesk/ProductName\", \"NexusRemote/g" flutter/windows/runner/Runner.rc
-          sed -i "s/L\"RustDesk\"/L\"NexusRemote\"/g" flutter/windows/runner/main.cpp
           if [ -f libs/hbb_common/src/config.rs ]; then
             sed -i "s/\"RustDesk\"/\"NexusRemote\"/g" libs/hbb_common/src/config.rs
           fi
           echo "Branding applied"
 
-      - name: Generate bridge code
-        shell: bash
-        run: |
-          cd flutter
-          flutter pub get
-          cd ..
-          flutter_rust_bridge_codegen generate
-
-      - name: Build Rust
+      - name: Build Sciter version
         shell: bash
         run: |
           export VCPKG_ROOT=/c/vcpkg
           export LIBCLANG_PATH="/c/Program Files/LLVM/bin"
-          cd libs/virtual_display/dylib
-          cargo build --release
-          cd ../../..
-          python build.py --flutter --skip-portable-pack
-
-      - name: Build Flutter
-        shell: bash
-        run: |
-          cd flutter
-          flutter build windows --release
+          cargo build --release --features inline,vram
+          echo "Build completed"
+          ls -la target/release/nexusremote.exe 2>/dev/null || ls -la target/release/nexusremote* 2>/dev/null || ls -la target/release/*.exe 2>/dev/null
 
       - name: Package
         shell: bash
         run: |
           mkdir -p output
-          cp flutter/build/windows/x64/runner/Release/nexusremote.exe output/
-          cp flutter/build/windows/x64/runner/Release/*.dll output/
-          cp libs/virtual_display/dylib/target/release/dylib_virtual_display.dll output/
+          cp target/release/nexusremote.exe output/ 2>/dev/null || cp target/release/nexusremote*.exe output/
           ls -la output/
 
       - name: Upload artifact
