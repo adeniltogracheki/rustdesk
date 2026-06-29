@@ -1,5 +1,5 @@
 [package]
-name = "rustdesk"
+name = "nexusremote"
 version = "1.4.8"
 authors = ["rustdesk <info@rustdesk.com>"]
 edition = "2021"
@@ -214,9 +214,9 @@ libxdo-sys = { path = "libs/libxdo-sys-stub" }
 
 [package.metadata.winres]
 LegalCopyright = "Copyright © 2025 Purslane Ltd. All rights reserved."
-ProductName = "RustDesk"
-FileDescription = "RustDesk Remote Desktop"
-OriginalFilename = "rustdesk.exe"
+ProductName = "NexusRemote"
+FileDescription = "NexusRemote Remote Desktop"
+OriginalFilename = "nexusremote.exe"
 
 [target.'cfg(target_os="windows")'.build-dependencies]
 winres = "0.1"

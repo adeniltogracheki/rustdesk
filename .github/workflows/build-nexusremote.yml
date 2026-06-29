@@ -1,0 +1,93 @@
+name: Build NexusRemote
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: "stable"
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          cd C:\vcpkg
+          git checkout 120deac3062162151622ca4860575a33844ba10b
+          .\bootstrap-vcpkg.bat
+          .\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+
+      - name: Setup LLVM
+        run: choco install llvm -y --version 15.0.6
+
+      - name: Apply branding
+        run: |
+          $env:APP_NAME = "NexusRemote"
+          $env:APP_COMPANY = "GMTec"
+          
+          (Get-Content Cargo.toml -Raw) -replace "name = \"rustdesk\"", "name = \"nexusremote\"" `
+            -replace "ProductName = \"RustDesk\"", "ProductName = \"NexusRemote\"" `
+            -replace "FileDescription = \"RustDesk Remote Desktop\"", "FileDescription = \"NexusRemote Remote Desktop\"" `
+            -replace "OriginalFilename = \"rustdesk.exe\"", "OriginalFilename = \"nexusremote.exe\"" `
+            | Set-Content Cargo.toml -NoNewline
+          
+          (Get-Content flutter/windows/CMakeLists.txt -Raw) `
+            -replace "set(BINARY_NAME \"rustdesk\")", "set(BINARY_NAME \"nexusremote\")" `
+            | Set-Content flutter/windows/CMakeLists.txt -NoNewline
+          
+          $rc = Get-Content flutter/windows/runner/Runner.rc -Raw
+          $rc = $rc -replace "CompanyName\", \"Purslane Ltd", "CompanyName\", \"GMTec"
+          $rc = $rc -replace "FileDescription\", \"RustDesk Remote Desktop", "FileDescription\", \"NexusRemote Remote Desktop"
+          $rc = $rc -replace "InternalName\", \"rustdesk", "InternalName\", \"nexusremote"
+          $rc = $rc -replace "OriginalFilename\", \"rustdesk.exe", "OriginalFilename\", \"nexusremote.exe"
+          $rc = $rc -replace "ProductName\", \"RustDesk", "ProductName\", \"NexusRemote"
+          $rc | Set-Content flutter/windows/runner/Runner.rc -NoNewline
+          
+          (Get-Content flutter/windows/runner/main.cpp -Raw) `
+            -replace "L\"RustDesk\"", "L\"NexusRemote\"" `
+            | Set-Content flutter/windows/runner/main.cpp -NoNewline
+
+      - name: Build Rust
+        run: |
+          $env:VCPKG_ROOT = "C:\vcpkg"
+          $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+          cd libs\virtual_display\dylib
+          cargo build --locked --release
+          cd ..\..\..
+          python build.py --flutter --hwcodec --skip-portable-pack
+
+      - name: Build Flutter
+        run: |
+          cd flutter
+          flutter pub get
+          flutter build windows --release
+
+      - name: Package
+        run: |
+          mkdir output
+          Copy-Item "flutter\build\windows\x64\runner\Release\nexusremote.exe" "output\" -Force
+          Copy-Item "flutter\build\windows\x64\runner\Release\*.dll" "output\" -Force
+          Copy-Item "libs\virtual_display\dylib\target\release\dylib_virtual_display.dll" "output\" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NexusRemote-Windows
+          path: output\
+          retention-days: 30
