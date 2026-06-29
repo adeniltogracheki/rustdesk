@@ -63,7 +63,7 @@ jobs:
           cd libs/virtual_display/dylib
           cargo build --release
           cd ../../..
-          python build.py --flutter --hwcodec --skip-portable-pack
+          python build.py --flutter --skip-portable-pack
 
       - name: Build Flutter
         shell: bash
