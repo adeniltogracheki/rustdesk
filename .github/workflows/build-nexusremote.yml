@@ -26,65 +26,73 @@ jobs:
           channel: "stable"
 
       - name: Setup vcpkg
+        shell: bash
         run: |
-          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
-          cd C:\vcpkg
+          git clone https://github.com/microsoft/vcpkg.git /c/vcpkg
+          cd /c/vcpkg
           git checkout 120deac3062162151622ca4860575a33844ba10b
-          .\bootstrap-vcpkg.bat
-          .\vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
+          ./bootstrap-vcpkg.bat
+          ./vcpkg install libvpx:x64-windows-static libyuv:x64-windows-static opus:x64-windows-static aom:x64-windows-static
 
       - name: Apply branding
+        shell: bash
         run: |
-          $env:APP_NAME = "NexusRemote"
-          $env:APP_COMPANY = "GMTec"
+          # Cargo.toml
+          sed -i "s/name = \"rustdesk\"/name = \"nexusremote\"/g" Cargo.toml
+          sed -i "s/ProductName = \"RustDesk\"/ProductName = \"NexusRemote\"/g" Cargo.toml
+          sed -i "s/FileDescription = \"RustDesk Remote Desktop\"/FileDescription = \"NexusRemote Remote Desktop\"/g" Cargo.toml
+          sed -i "s/OriginalFilename = \"rustdesk.exe\"/OriginalFilename = \"nexusremote.exe\"/g" Cargo.toml
           
-          (Get-Content Cargo.toml -Raw) -replace "name = \"rustdesk\"", "name = \"nexusremote\"" `
-            -replace "ProductName = \"RustDesk\"", "ProductName = \"NexusRemote\"" `
-            -replace "FileDescription = \"RustDesk Remote Desktop\"", "FileDescription = \"NexusRemote Remote Desktop\"" `
-            -replace "OriginalFilename = \"rustdesk.exe\"", "OriginalFilename = \"nexusremote.exe\"" `
-            | Set-Content Cargo.toml -NoNewline
+          # CMakeLists.txt
+          sed -i "s/set(BINARY_NAME \"rustdesk\")/set(BINARY_NAME \"nexusremote\")/g" flutter/windows/CMakeLists.txt
           
-          (Get-Content flutter/windows/CMakeLists.txt -Raw) `
-            -replace "set(BINARY_NAME \"rustdesk\")", "set(BINARY_NAME \"nexusremote\")" `
-            | Set-Content flutter/windows/CMakeLists.txt -NoNewline
+          # Runner.rc
+          sed -i "s/CompanyName\", \"Purslane Ltd/CompanyName\", \"GMTec/g" flutter/windows/runner/Runner.rc
+          sed -i "s/FileDescription\", \"RustDesk Remote Desktop/FileDescription\", \"NexusRemote Remote Desktop/g" flutter/windows/runner/Runner.rc
+          sed -i "s/InternalName\", \"rustdesk/InternalName\", \"nexusremote/g" flutter/windows/runner/Runner.rc
+          sed -i "s/OriginalFilename\", \"rustdesk.exe/OriginalFilename\", \"nexusremote.exe/g" flutter/windows/runner/Runner.rc
+          sed -i "s/ProductName\", \"RustDesk/ProductName\", \"NexusRemote/g" flutter/windows/runner/Runner.rc
           
-          $rc = Get-Content flutter/windows/runner/Runner.rc -Raw
-          $rc = $rc -replace "CompanyName\", \"Purslane Ltd", "CompanyName\", \"GMTec"
-          $rc = $rc -replace "FileDescription\", \"RustDesk Remote Desktop", "FileDescription\", \"NexusRemote Remote Desktop"
-          $rc = $rc -replace "InternalName\", \"rustdesk", "InternalName\", \"nexusremote"
-          $rc = $rc -replace "OriginalFilename\", \"rustdesk.exe", "OriginalFilename\", \"nexusremote.exe"
-          $rc = $rc -replace "ProductName\", \"RustDesk", "ProductName\", \"NexusRemote"
-          $rc | Set-Content flutter/windows/runner/Runner.rc -NoNewline
+          # main.cpp
+          sed -i "s/L\"RustDesk\"/L\"NexusRemote\"/g" flutter/windows/runner/main.cpp
           
-          (Get-Content flutter/windows/runner/main.cpp -Raw) `
-            -replace "L\"RustDesk\"", "L\"NexusRemote\"" `
-            | Set-Content flutter/windows/runner/main.cpp -NoNewline
+          # config.rs
+          if [ -f libs/hbb_common/src/config.rs ]; then
+            sed -i "s/\"RustDesk\"/\"NexusRemote\"/g" libs/hbb_common/src/config.rs
+          fi
+          
+          echo "Branding applied successfully"
 
       - name: Build Rust
+        shell: bash
         run: |
-          $env:VCPKG_ROOT = "C:\vcpkg"
-          $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
-          cd libs\virtual_display\dylib
+          export VCPKG_ROOT=/c/vcpkg
+          export LIBCLANG_PATH="/c/Program Files/LLVM/bin"
+          cd libs/virtual_display/dylib
           cargo build --locked --release
-          cd ..\..\..
+          cd ../../..
           python build.py --flutter --hwcodec --skip-portable-pack
 
       - name: Build Flutter
+        shell: bash
         run: |
           cd flutter
           flutter pub get
           flutter build windows --release
 
       - name: Package
+        shell: bash
         run: |
-          mkdir output
-          Copy-Item "flutter\build\windows\x64\runner\Release\nexusremote.exe" "output\" -Force
-          Copy-Item "flutter\build\windows\x64\runner\Release\*.dll" "output\" -Force
-          Copy-Item "libs\virtual_display\dylib\target\release\dylib_virtual_display.dll" "output\" -Force
+          mkdir -p output
+          cp flutter/build/windows/x64/runner/Release/nexusremote.exe output/
+          cp flutter/build/windows/x64/runner/Release/*.dll output/
+          cp libs/virtual_display/dylib/target/release/dylib_virtual_display.dll output/
+          echo "Package created:"
+          ls -la output/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: NexusRemote-Windows
-          path: output\
+          path: output/
           retention-days: 30
