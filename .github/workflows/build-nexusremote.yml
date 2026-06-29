@@ -28,7 +28,9 @@ jobs:
       - name: Setup vcpkg
         shell: bash
         run: |
-          git clone https://github.com/microsoft/vcpkg.git /c/vcpkg
+          if [ ! -d "/c/vcpkg" ]; then
+            git clone https://github.com/microsoft/vcpkg.git /c/vcpkg
+          fi
           cd /c/vcpkg
           git checkout 120deac3062162151622ca4860575a33844ba10b
           ./bootstrap-vcpkg.bat
@@ -37,31 +39,21 @@ jobs:
       - name: Apply branding
         shell: bash
         run: |
-          # Cargo.toml
           sed -i "s/name = \"rustdesk\"/name = \"nexusremote\"/g" Cargo.toml
           sed -i "s/ProductName = \"RustDesk\"/ProductName = \"NexusRemote\"/g" Cargo.toml
           sed -i "s/FileDescription = \"RustDesk Remote Desktop\"/FileDescription = \"NexusRemote Remote Desktop\"/g" Cargo.toml
           sed -i "s/OriginalFilename = \"rustdesk.exe\"/OriginalFilename = \"nexusremote.exe\"/g" Cargo.toml
-          
-          # CMakeLists.txt
           sed -i "s/set(BINARY_NAME \"rustdesk\")/set(BINARY_NAME \"nexusremote\")/g" flutter/windows/CMakeLists.txt
-          
-          # Runner.rc
           sed -i "s/CompanyName\", \"Purslane Ltd/CompanyName\", \"GMTec/g" flutter/windows/runner/Runner.rc
           sed -i "s/FileDescription\", \"RustDesk Remote Desktop/FileDescription\", \"NexusRemote Remote Desktop/g" flutter/windows/runner/Runner.rc
           sed -i "s/InternalName\", \"rustdesk/InternalName\", \"nexusremote/g" flutter/windows/runner/Runner.rc
           sed -i "s/OriginalFilename\", \"rustdesk.exe/OriginalFilename\", \"nexusremote.exe/g" flutter/windows/runner/Runner.rc
           sed -i "s/ProductName\", \"RustDesk/ProductName\", \"NexusRemote/g" flutter/windows/runner/Runner.rc
-          
-          # main.cpp
           sed -i "s/L\"RustDesk\"/L\"NexusRemote\"/g" flutter/windows/runner/main.cpp
-          
-          # config.rs
           if [ -f libs/hbb_common/src/config.rs ]; then
             sed -i "s/\"RustDesk\"/\"NexusRemote\"/g" libs/hbb_common/src/config.rs
           fi
-          
-          echo "Branding applied successfully"
+          echo "Branding applied"
 
       - name: Build Rust
         shell: bash
@@ -87,7 +79,6 @@ jobs:
           cp flutter/build/windows/x64/runner/Release/nexusremote.exe output/
           cp flutter/build/windows/x64/runner/Release/*.dll output/
           cp libs/virtual_display/dylib/target/release/dylib_virtual_display.dll output/
-          echo "Package created:"
           ls -la output/
 
       - name: Upload artifact
